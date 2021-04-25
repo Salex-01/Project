@@ -1,3 +1,4 @@
+import java.util.Comparator;
 import java.util.LinkedList;
 
 public class ElevatorSim extends Thread {
@@ -6,11 +7,11 @@ public class ElevatorSim extends Thread {
     int nFloors = 3;
     String schedulerMode = "FCFS";  // FCFS,  SSTF  ou  LS
     String idleMode = "mid";    // mid, high ou low
+    double elevatorSpeed = 6;   // En étages par minute
     Elevator[] elevators;
     double oldTime = 0;
     double time = 0;
     LinkedList<Call> calls = new LinkedList<>();
-    LinkedList<Integer> floors = new LinkedList<>();
     LinkedList<Call> working = new LinkedList<>();
     ElevatorRandom r = new ElevatorRandom();
 
@@ -37,6 +38,10 @@ public class ElevatorSim extends Thread {
                     idleMode = args[i + 1];
                     i++;
                     break;
+                case "speed":
+                    elevatorSpeed = Double.parseDouble(args[i + 1]);
+                    i++;
+                    break;
                 default:
                     System.out.println("Argument inconnu : " + args[i]);
                     System.exit(-1);
@@ -54,7 +59,12 @@ public class ElevatorSim extends Thread {
         working.addLast(new Call(r.nextPoisson(0.5), 0, r.nextInt(nFloors - 1) + 1, r.nextExponential(60)));
         while (!stopped) {
             if (working.getFirst().arrivalTime == time) {
-                calls.addLast(working.removeFirst());
+                Call c = working.removeFirst();
+                if (c.origin == 0) {
+                    working.addLast(new Call(time + r.nextPoisson(0.5), 0, r.nextInt(nFloors - 1) + 1, r.nextExponential(60)));
+                    working.sort(Comparator.comparingDouble(o -> o.arrivalTime));
+                }
+                calls.addLast(c);
             }
             for (Elevator e : elevators) {
                 e.work(time, time - oldTime, schedulerMode, idleMode);
