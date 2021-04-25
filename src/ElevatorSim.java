@@ -1,11 +1,18 @@
+import java.util.LinkedList;
+
 public class ElevatorSim extends Thread {
+    boolean stopped = false;
     int nElevators = 1;
     int nFloors = 3;
     String schedulerMode = "FCFS";  // FCFS,  SSTF  ou  LS
     String idleMode = "mid";    // mid, high ou low
     Elevator[] elevators;
-    Floor[] floors;
-
+    double oldTime = 0;
+    double time = 0;
+    LinkedList<Call> calls = new LinkedList<>();
+    LinkedList<Integer> floors = new LinkedList<>();
+    LinkedList<Call> working = new LinkedList<>();
+    ElevatorRandom r = new ElevatorRandom();
 
     public ElevatorSim(String[] args) {
         for (int i = 0; i < args.length; i++) {
@@ -36,11 +43,34 @@ public class ElevatorSim extends Thread {
             }
         }
         elevators = new Elevator[nElevators];
-        floors = new Floor[nFloors];
+        for (int i = 0; i < nElevators; i++) {
+            elevators[i] = new Elevator(this);
+        }
     }
 
     @Override
     public void run() {
-        // TODO
+        calls.addLast(new Call(0, 0, r.nextInt(nFloors - 1) + 1, r.nextExponential(60)));
+        working.addLast(new Call(r.nextPoisson(0.5), 0, r.nextInt(nFloors - 1) + 1, r.nextExponential(60)));
+        while (!stopped) {
+            if (working.getFirst().arrivalTime == time) {
+                calls.addLast(working.removeFirst());
+            }
+            for (Elevator e : elevators) {
+                e.work(time, time - oldTime, schedulerMode, idleMode);
+            }
+            oldTime = time;
+            time = nextEvent();
+        }
+    }
+
+    public double nextEvent() {
+        double min = Double.MAX_VALUE;
+        for (Call c : working) {
+            if (c.arrivalTime < min) {
+                min = c.arrivalTime;
+            }
+        }
+        return min;
     }
 }
