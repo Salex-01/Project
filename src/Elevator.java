@@ -5,6 +5,7 @@ public class Elevator {
     LinkedList<Call> carrying = new LinkedList<>();
     double floor;
     int nextTarget = 0;
+    double currentActionCompletionTime = 0;
 
     public Elevator(ElevatorSim s) {
         sim = s;
@@ -30,7 +31,7 @@ public class Elevator {
     private void moveToIdle(double deltaTime, String mode){
         switch (mode){
             case "low":
-                
+
                 break;
             case "mid":
                 break;

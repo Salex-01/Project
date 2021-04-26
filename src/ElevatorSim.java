@@ -14,6 +14,7 @@ public class ElevatorSim extends Thread {
     LinkedList<Call> calls = new LinkedList<>();
     LinkedList<Call> working = new LinkedList<>();
     ElevatorRandom r = new ElevatorRandom();
+    double poissonLambda = 0.5;
 
     public ElevatorSim(String[] args) {
         for (int i = 0; i < args.length; i++) {
@@ -56,12 +57,12 @@ public class ElevatorSim extends Thread {
     @Override
     public void run() {
         calls.addLast(new Call(0, 0, r.nextInt(nFloors - 1) + 1, r.nextExponential(60)));
-        working.addLast(new Call(r.nextPoisson(0.5), 0, r.nextInt(nFloors - 1) + 1, r.nextExponential(60)));
+        working.addLast(new Call(r.nextPoissonTime(poissonLambda), 0, r.nextInt(nFloors - 1) + 1, r.nextExponential(60)));
         while (!stopped) {
             if (working.getFirst().arrivalTime == time) {
                 Call c = working.removeFirst();
                 if (c.origin == 0) {
-                    working.addLast(new Call(time + r.nextPoisson(0.5), 0, r.nextInt(nFloors - 1) + 1, r.nextExponential(60)));
+                    working.addLast(new Call(time + r.nextPoissonTime(poissonLambda), 0, r.nextInt(nFloors - 1) + 1, r.nextExponential(60)));
                     working.sort(Comparator.comparingDouble(o -> o.arrivalTime));
                 }
                 calls.addLast(c);
@@ -79,6 +80,11 @@ public class ElevatorSim extends Thread {
         for (Call c : working) {
             if (c.arrivalTime < min) {
                 min = c.arrivalTime;
+            }
+        }
+        for (Elevator e : elevators) {
+            if (e.currentActionCompletionTime < min) {
+                min = e.currentActionCompletionTime;
             }
         }
         return min;
