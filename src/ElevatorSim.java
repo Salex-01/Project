@@ -83,7 +83,7 @@ public class ElevatorSim extends Thread {
             }
         }
         for (Elevator e : elevators) {
-            if (e.currentActionCompletionTime < min) {
+            if (e.currentActionCompletionTime < min && e.currentActionCompletionTime > time) {
                 min = e.currentActionCompletionTime;
             }
         }
