@@ -1,3 +1,4 @@
+import java.io.IOException;
 import java.util.Comparator;
 import java.util.LinkedList;
 
@@ -5,16 +6,18 @@ public class ElevatorSim extends Thread {
     boolean stopped = false;
     int nElevators = 1;
     int nFloors = 3;
-    String schedulerMode = "FCFS";  // FCFS,  SSTF  ou  LS
+    String schedulerMode = "fcfs";  // fcfs,  sstf  ou  ls
     String idleMode = "mid";    // mid, high ou low
     double elevatorSpeed = 6;   // En étages par minute
     Elevator[] elevators;
     double oldTime = 0;
     double time = 0;
-    LinkedList<Call> calls = new LinkedList<>();
-    LinkedList<Call> working = new LinkedList<>();
+    LinkedList<Person> people = new LinkedList<>();
+    LinkedList<Person> working = new LinkedList<>();
     ElevatorRandom r = new ElevatorRandom();
     double poissonLambda = 0.5;
+    double meanWaitingTime = 0;
+    int served = 0;
 
     public ElevatorSim(String[] args) {
         for (int i = 0; i < args.length; i++) {
@@ -56,30 +59,32 @@ public class ElevatorSim extends Thread {
 
     @Override
     public void run() {
-        calls.addLast(new Call(0, 0, r.nextInt(nFloors - 1) + 1, r.nextExponential(60)));
-        working.addLast(new Call(r.nextPoissonTime(poissonLambda), 0, r.nextInt(nFloors - 1) + 1, r.nextExponential(60)));
+        new Stopper(this).start();
+        people.addLast(new Person(0, 0, r.nextInt(nFloors - 1) + 1, r.nextExponential(60)));
+        working.addLast(new Person(r.nextPoissonTime(poissonLambda), 0, r.nextInt(nFloors - 1) + 1, r.nextExponential(60)));
         while (!stopped) {
             if (working.getFirst().arrivalTime == time) {
-                Call c = working.removeFirst();
+                Person c = working.removeFirst();
                 if (c.origin == 0) {
-                    working.addLast(new Call(time + r.nextPoissonTime(poissonLambda), 0, r.nextInt(nFloors - 1) + 1, r.nextExponential(60)));
+                    working.addLast(new Person(time + r.nextPoissonTime(poissonLambda), 0, r.nextInt(nFloors - 1) + 1, r.nextExponential(60)));
                     working.sort(Comparator.comparingDouble(o -> o.arrivalTime));
                 }
-                calls.addLast(c);
+                people.addLast(c);
             }
             for (Elevator e : elevators) {
-                e.work(time, time - oldTime, schedulerMode, idleMode);
+                e.work(time - oldTime, schedulerMode, idleMode);
             }
             oldTime = time;
             time = nextEvent();
         }
+        System.out.println("Temps d'attente moyen sur " + served + " personnes : " + meanWaitingTime + "minutes");
     }
 
     public double nextEvent() {
         double min = Double.MAX_VALUE;
-        for (Call c : working) {
-            if (c.arrivalTime < min) {
-                min = c.arrivalTime;
+        for (Person p : working) {
+            if (p.arrivalTime < min) {
+                min = p.arrivalTime;
             }
         }
         for (Elevator e : elevators) {
@@ -88,5 +93,29 @@ public class ElevatorSim extends Thread {
             }
         }
         return min;
+    }
+
+    private static class Stopper extends Thread {
+        ElevatorSim sim;
+
+        public Stopper(ElevatorSim s) {
+            sim = s;
+        }
+
+        @Override
+        @SuppressWarnings("BusyWait")
+        public void run() {
+            while (true) {
+                try {
+                    if (System.in.available() != 0) break;
+                } catch (IOException ignored) {
+                }
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException ignored) {
+                }
+            }
+            sim.stopped = true;
+        }
     }
 }

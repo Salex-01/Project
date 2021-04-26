@@ -1,10 +1,11 @@
-public class Call {
+public class Person {
     double arrivalTime;
     int origin;
     int destination;
     double duration;
+    double waitingTime = 0;
 
-    public Call(double a, int o, int dest, double dur) {
+    public Person(double a, int o, int dest, double dur) {
         arrivalTime = a;
         origin = o;
         destination = dest;
