@@ -4,6 +4,7 @@ public class Person {
     int destination;
     double duration;
     double waitingTime = 0;
+    Elevator targetTakenBy = null;
 
     public Person(double a, int o, int dest, double dur) {
         arrivalTime = a;

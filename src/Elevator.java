@@ -19,10 +19,11 @@ public class Elevator {
             return;
         }
         if (carrying.isEmpty()) {
-            if (target == null && sim.calls.isEmpty()) {
+            if (sim.calls.stream().noneMatch(person -> (person.targetTakenBy == this || person.targetTakenBy == null))) {
+                target = null;
                 moveToIdle(deltaTime, idle);
             } else {
-                moveToNext(deltaTime, scheduler);
+                moveToNextTarget(deltaTime, scheduler);
             }
         } else {
             carryPeople(deltaTime, scheduler, idle, log);
@@ -56,54 +57,56 @@ public class Elevator {
         }
     }
 
-    private void moveToNext(double deltaTime, String mode) {
-        if (target == null) {
+    private void findFreeTarget() {
+        for (Person p : sim.calls) {
+            if (p.targetTakenBy == null) {
+                target = p;
+                break;
+            }
+        }
+    }
+
+    private void moveToNextTarget(double deltaTime, String mode) {
+        if (target == null || !sim.calls.contains(target)) {
+            target = null;
             // fcfs,  sstf  ou  ls
             switch (mode) {
                 case "fcfs":    // Premier arrivé premier servi
-                    target = sim.calls.removeFirst();
+                    findFreeTarget();
+                    target.targetTakenBy = this;
                     currentActionCompletionTime = sim.time + Math.abs(floor - target.origin) / sim.elevatorSpeed;
                     return;
                 case "sstf":    // Demande la plus proche
-                    target = sim.calls.getFirst();
                     for (Person p : sim.calls) {
-                        if (Math.abs(floor - p.origin) < Math.abs(floor - target.origin)) {
+                        if ((target == null || Math.abs(floor - p.origin) < Math.abs(floor - target.origin)) && p.targetTakenBy == null) {
                             target = p;
                         }
                     }
-                    sim.calls.remove(target);
+                    //noinspection ConstantConditions
+                    target.targetTakenBy = this;
                     currentActionCompletionTime = sim.time + Math.abs(floor - target.origin) / sim.elevatorSpeed;
                     return;
                 case "ls":  // Premier arrivé premier servi dans la direction actuelle
-                    if (direction) {
-                        for (Person p : sim.calls) {
-                            if (p.origin >= floor) {
-                                target = p;
-                                sim.calls.remove(p);
-                                currentActionCompletionTime = sim.time + Math.abs(floor - target.origin) / sim.elevatorSpeed;
-                                return;
-                            }
-                        }
-                    } else {
-                        for (Person p : sim.calls) {
-                            if (p.origin <= floor) {
-                                target = p;
-                                sim.calls.remove(p);
-                                currentActionCompletionTime = sim.time + Math.abs(floor - target.origin) / sim.elevatorSpeed;
-                                return;
-                            }
+                    for (Person p : sim.calls) {
+                        if ((p.origin == floor || (p.origin > floor) == direction) && p.targetTakenBy == null) {
+                            target = p;
+                            break;
                         }
                     }
-                    //noinspection ConstantConditions
-                    if (target == null) {   // Quand il n'y a aucune demande dans la direction actuelle
-                        target = sim.calls.removeFirst();
-                        currentActionCompletionTime = sim.time + Math.abs(floor - target.origin) / sim.elevatorSpeed;
-                        return;
+                    if (target == null) {  // Quand il n'y a aucune demande dans la direction actuelle
+                        findFreeTarget();
                     }
-                    break;
+                    target.targetTakenBy = this;
+                    currentActionCompletionTime = sim.time + Math.abs(floor - target.origin) / sim.elevatorSpeed;
+                    return;
                 default:
                     System.out.println("Planificateur inconnu : " + mode);
                     System.exit(-1);
+            }
+        }
+        for (Person p : sim.calls) {
+            if (p.origin == target.origin && p.targetTakenBy == null) {
+                p.targetTakenBy = this;
             }
         }
         if (floor < target.origin) {
@@ -113,15 +116,27 @@ public class Elevator {
             floor = Math.max(target.origin, floor - deltaTime * sim.elevatorSpeed);
             currentActionCompletionTime = sim.time + (floor - target.origin) / sim.elevatorSpeed;
         }
-        if (Math.abs(floor - target.origin) < 0.000001) {  // Pour contourner les erreurs de précision des doubles
-            carrying.addLast(target);
+        if (Math.abs(floor - target.origin) < 1E-6) {  // Pour contourner les erreurs de précision des doubles
+            floor = target.origin;
             target = null;
+            for (Person p : sim.calls) {
+                if (p.origin == floor) {
+                    carrying.addLast(p);
+                }
+            }
+            for (Person p : carrying) {
+                sim.calls.remove(p);
+                p.targetTakenBy = null;
+            }
             currentActionCompletionTime = sim.time + Math.abs(carrying.getFirst().destination - floor) / sim.elevatorSpeed;
         }
     }
 
     private void carryPeople(double deltaTime, String s, String i, boolean log) {
         if (deltaTime <= 0) {
+            if (!carrying.isEmpty()) {
+                currentActionCompletionTime = sim.time + Math.abs(floor - carrying.getFirst().destination) / sim.elevatorSpeed;
+            }
             return;
         }
         if (floor < carrying.getFirst().destination) {
@@ -164,7 +179,7 @@ public class Elevator {
                     sim.totalWaitingTime = sim.totalWaitingTime + p.waitingTime;
                     sim.served++;
                     if (log) {
-                        System.out.println("Temps d'attente : " + p.waitingTime * 60 + " secondes");
+                        System.out.println("Temps d'attente : " + p.waitingTime * 60 + " secondes pour l'aller retour à l'étage " + p.origin);
                     }
                 }
             }

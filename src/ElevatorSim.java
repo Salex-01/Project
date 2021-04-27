@@ -94,16 +94,36 @@ public class ElevatorSim extends Thread {
                 }
                 calls.addLast(c);
             }
+            elevatorTargets();
             for (Elevator e : elevators) {
                 e.work(time - oldTime, schedulerMode, idleMode, log);
             }
             oldTime = time;
             time = nextEvent();
         }
-        System.out.println("Temps d'attente moyen sur " + served + " personnes : " + totalWaitingTime * 60 / served + " secondes");
-        String[] ObjButtons = {"OK"};
-        JOptionPane.showOptionDialog(null, "Temps d'attente moyen sur " + served + " personnes : " + totalWaitingTime * 60 / served + " secondes", "", JOptionPane.DEFAULT_OPTION, JOptionPane.INFORMATION_MESSAGE, null, ObjButtons, ObjButtons[0]);
+        System.out.println("Temps d'attente moyen sur "
+                + served + (served > 1 ? " personnes avec " : " personne avec ")
+                + nElevators + (nElevators > 1 ? " ascenseurs : " : " ascenseur : ")
+                + totalWaitingTime * 60 / served + " secondes");
+        String[] button = {"OK"};
+        JOptionPane.showOptionDialog(null, "Temps d'attente moyen sur "
+                        + served + (served > 1 ? " personnes avec " : " personne avec ")
+                        + nElevators + (nElevators > 1 ? " ascenseurs : " : " ascenseur : ")
+                        + totalWaitingTime * 60 / served + " secondes",
+                "", JOptionPane.DEFAULT_OPTION, JOptionPane.INFORMATION_MESSAGE, null, button, button[0]);
         System.exit(0);
+    }
+
+    private void elevatorTargets() {
+        Elevator[] e = new Elevator[nFloors];
+        for (Person p : calls) {
+            if (p.targetTakenBy != null) {
+                e[p.origin] = p.targetTakenBy;
+            }
+        }
+        for (Person p : calls) {
+            p.targetTakenBy = e[p.origin];
+        }
     }
 
     public double nextEvent() {
