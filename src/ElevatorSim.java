@@ -1,3 +1,4 @@
+import javax.swing.*;
 import java.io.IOException;
 import java.util.Comparator;
 import java.util.LinkedList;
@@ -12,12 +13,15 @@ public class ElevatorSim extends Thread {
     Elevator[] elevators;
     double oldTime = 0;
     double time = 0;
-    LinkedList<Person> people = new LinkedList<>();
+    LinkedList<Person> calls = new LinkedList<>();
     LinkedList<Person> working = new LinkedList<>();
     ElevatorRandom r = new ElevatorRandom();
-    double poissonLambda = 0.5;
-    double meanWaitingTime = 0;
+    double arrivalLambda = 1. / 2;
+    double workLambda = 1. / 60;
+    double totalWaitingTime = 0;
     int served = 0;
+    long maxPeople = Long.MAX_VALUE;
+    boolean log = false;
 
     public ElevatorSim(String[] args) {
         for (int i = 0; i < args.length; i++) {
@@ -42,9 +46,27 @@ public class ElevatorSim extends Thread {
                     idleMode = args[i + 1];
                     i++;
                     break;
+                case "maxPeople":
+                case "mp":
+                    maxPeople = Long.parseLong(args[i + 1]);
+                    i++;
+                    break;
+                case "arrivalLambda":
+                case "al":
+                    arrivalLambda = Double.parseDouble(args[i + 1]);
+                    i++;
+                    break;
+                case "workLambda":
+                case "wl":
+                    workLambda = Double.parseDouble(args[i + 1]);
+                    i++;
+                    break;
                 case "speed":
                     elevatorSpeed = Double.parseDouble(args[i + 1]);
                     i++;
+                    break;
+                case "log":
+                    log = true;
                     break;
                 default:
                     System.out.println("Argument inconnu : " + args[i]);
@@ -59,36 +81,38 @@ public class ElevatorSim extends Thread {
 
     @Override
     public void run() {
-        new Stopper(this).start();
-        people.addLast(new Person(0, 0, r.nextInt(nFloors - 1) + 1, r.nextExponential(60)));
-        working.addLast(new Person(r.nextPoissonTime(poissonLambda), 0, r.nextInt(nFloors - 1) + 1, r.nextExponential(60)));
-        while (!stopped) {
-            if (working.getFirst().arrivalTime == time) {
+        new Stopper(this, true).start();
+        Stopper s = new Stopper(this, false);
+        s.start();
+        working.addLast(new Person(time + r.nextExponential(arrivalLambda), 0, r.nextInt(nFloors - 1) + 1, r.nextExponential(workLambda)));
+        while (!stopped && served < maxPeople) {
+            if (time >= working.getFirst().arrivalTime) {   // Normalement, si vrai, arrivalTime==time
                 Person c = working.removeFirst();
                 if (c.origin == 0) {
-                    working.addLast(new Person(time + r.nextPoissonTime(poissonLambda), 0, r.nextInt(nFloors - 1) + 1, r.nextExponential(60)));
+                    working.addLast(new Person(time + r.nextExponential(arrivalLambda), 0, r.nextInt(nFloors - 1) + 1, r.nextExponential(workLambda)));
                     working.sort(Comparator.comparingDouble(o -> o.arrivalTime));
                 }
-                people.addLast(c);
+                calls.addLast(c);
             }
             for (Elevator e : elevators) {
-                e.work(time - oldTime, schedulerMode, idleMode);
+                e.work(time - oldTime, schedulerMode, idleMode, log);
             }
             oldTime = time;
             time = nextEvent();
         }
-        System.out.println("Temps d'attente moyen sur " + served + " personnes : " + meanWaitingTime + "minutes");
+        System.out.println("Temps d'attente moyen sur " + served + " personnes : " + totalWaitingTime * 60 / served + " secondes");
+        String[] ObjButtons = {"OK"};
+        JOptionPane.showOptionDialog(null, "Temps d'attente moyen sur " + served + " personnes : " + totalWaitingTime * 60 / served + " secondes", "", JOptionPane.DEFAULT_OPTION, JOptionPane.INFORMATION_MESSAGE, null, ObjButtons, ObjButtons[0]);
+        System.exit(0);
     }
 
     public double nextEvent() {
         double min = Double.MAX_VALUE;
-        for (Person p : working) {
-            if (p.arrivalTime < min) {
-                min = p.arrivalTime;
-            }
+        if (working.getFirst().arrivalTime < min) {
+            min = working.getFirst().arrivalTime;
         }
         for (Elevator e : elevators) {
-            if (e.currentActionCompletionTime < min && e.currentActionCompletionTime > time) {
+            if (e.currentActionCompletionTime < min && (e.currentActionCompletionTime > time || e.target != null)) {
                 min = e.currentActionCompletionTime;
             }
         }
@@ -97,23 +121,30 @@ public class ElevatorSim extends Thread {
 
     private static class Stopper extends Thread {
         ElevatorSim sim;
+        boolean mode;
 
-        public Stopper(ElevatorSim s) {
+        public Stopper(ElevatorSim s, boolean b) {
             sim = s;
+            mode = b;
         }
 
         @Override
         @SuppressWarnings("BusyWait")
         public void run() {
-            while (true) {
-                try {
-                    if (System.in.available() != 0) break;
-                } catch (IOException ignored) {
+            if (mode) {
+                while (true) {
+                    try {
+                        if (System.in.available() != 0) break;
+                    } catch (IOException ignored) {
+                    }
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException ignored) {
+                    }
                 }
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException ignored) {
-                }
+            } else {
+                String[] ObjButtons = {"STOP"};
+                JOptionPane.showOptionDialog(null, "", "", JOptionPane.DEFAULT_OPTION, JOptionPane.INFORMATION_MESSAGE, null, ObjButtons, ObjButtons[0]);
             }
             sim.stopped = true;
         }
