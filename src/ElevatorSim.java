@@ -73,6 +73,10 @@ public class ElevatorSim extends Thread {
                     System.exit(-1);
             }
         }
+        if (nFloors < 2) {
+            System.out.println("Au moins 2 étages");
+            System.exit(-1);
+        }
         elevators = new Elevator[nElevators];
         for (int i = 0; i < nElevators; i++) {
             elevators[i] = new Elevator(this);
@@ -102,12 +106,14 @@ public class ElevatorSim extends Thread {
             time = nextEvent();
         }
         System.out.println("Temps d'attente moyen sur "
-                + served + (served > 1 ? " personnes avec " : " personne avec ")
+                + served + (served > 1 ? " personnes et " : " personne et ")
+                + nFloors + " étages avec "
                 + nElevators + (nElevators > 1 ? " ascenseurs : " : " ascenseur : ")
                 + totalWaitingTime * 60 / served + " secondes");
         String[] button = {"OK"};
         JOptionPane.showOptionDialog(null, "Temps d'attente moyen sur "
-                        + served + (served > 1 ? " personnes avec " : " personne avec ")
+                        + served + (served > 1 ? " personnes et " : " personne et ")
+                        + nFloors + " étages avec "
                         + nElevators + (nElevators > 1 ? " ascenseurs : " : " ascenseur : ")
                         + totalWaitingTime * 60 / served + " secondes",
                 "", JOptionPane.DEFAULT_OPTION, JOptionPane.INFORMATION_MESSAGE, null, button, button[0]);
