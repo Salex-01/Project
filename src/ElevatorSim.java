@@ -6,7 +6,7 @@ import java.util.LinkedList;
 public class ElevatorSim extends Thread {
     boolean stopped = false;
     int nElevators = 1;
-    int nFloors = 3;
+    int nFloors = 7;
     String schedulerMode = "fcfs";  // fcfs,  sstf  ou  ls
     String idleMode = "mid";    // mid, high ou low
     double elevatorSpeed = 6;   // En étages par minute
@@ -20,8 +20,12 @@ public class ElevatorSim extends Thread {
     double workLambda = 1. / 60;
     double totalWaitingTime = 0;
     int served = 0;
-    long maxPeople = Long.MAX_VALUE;
+    long maxPeople = -1;
     boolean log = false;
+
+    public static void main(String[] args) {
+        new ElevatorSim(args).start();
+    }
 
     public ElevatorSim(String[] args) {
         for (int i = 0; i < args.length; i++) {
@@ -89,7 +93,7 @@ public class ElevatorSim extends Thread {
         Stopper s = new Stopper(this, false);
         s.start();
         working.addLast(new Person(time + r.nextExponential(arrivalLambda), 0, r.nextInt(nFloors - 1) + 1, r.nextExponential(workLambda)));
-        while (!stopped && served < maxPeople) {
+        while (!stopped && (served < maxPeople || maxPeople < 0)) {
             if (time >= working.getFirst().arrivalTime) {   // Normalement, si vrai, arrivalTime==time
                 Person c = working.removeFirst();
                 if (c.origin == 0) {
