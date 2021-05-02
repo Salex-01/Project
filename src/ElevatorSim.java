@@ -12,14 +12,14 @@ public class ElevatorSim extends Thread {
     double elevatorSpeed = 6;   // En étages par minute
     Elevator[] elevators;
     double oldTime = 0;
-    double time = 0;
-    LinkedList<Person> calls = new LinkedList<>();
-    LinkedList<Person> working = new LinkedList<>();
+    double time = 0;    // Heure de la simulation
+    LinkedList<Person> calls = new LinkedList<>();  // Demande à traiter
+    LinkedList<Person> working = new LinkedList<>();    // Demandes pas encore à traiter
     ElevatorRandom r = new ElevatorRandom();
     double arrivalLambda = 1. / 2;
     double workLambda = 1. / 60;
     double totalWaitingTime = 0;
-    int served = 0;
+    int served = 0; // Nombre de personnes servies
     long maxPeople = -1;
     boolean log = false;
 
@@ -92,8 +92,11 @@ public class ElevatorSim extends Thread {
         new Stopper(this, true).start();
         Stopper s = new Stopper(this, false);
         s.start();
+        // Ajout de la permière demande
         working.addLast(new Person(time + r.nextExponential(arrivalLambda), 0, r.nextInt(nFloors - 1) + 1, r.nextExponential(workLambda)));
+        // Boucle de simulation
         while (!stopped && (served < maxPeople || maxPeople < 0)) {
+            // Mise à jour des demandes
             if (time >= working.getFirst().arrivalTime) {   // Normalement, si vrai, arrivalTime==time
                 Person c = working.removeFirst();
                 if (c.origin == 0) {
@@ -102,13 +105,15 @@ public class ElevatorSim extends Thread {
                 }
                 calls.addLast(c);
             }
-            elevatorTargets();
+            elevatorTargets();  // Vérification des cibles
+            // Simulation des ascenseurs
             for (Elevator e : elevators) {
                 e.work(time - oldTime, schedulerMode, idleMode, log);
             }
             oldTime = time;
-            time = nextEvent();
+            time = nextEvent(); // Calcul de l'heure du prochain évènement de la simulation
         }
+        // Sortie des résultats
         System.out.println("Temps d'attente moyen sur "
                 + served + (served > 1 ? " personnes et " : " personne et ")
                 + nFloors + " étages avec "
@@ -124,6 +129,7 @@ public class ElevatorSim extends Thread {
         System.exit(0);
     }
 
+    // Vérification des cibles
     private void elevatorTargets() {
         Elevator[] e = new Elevator[nFloors];
         for (Person p : calls) {
@@ -136,19 +142,18 @@ public class ElevatorSim extends Thread {
         }
     }
 
+    // Calcul de l'heure du prochain évènement
     public double nextEvent() {
-        double min = Double.MAX_VALUE;
-        if (working.getFirst().arrivalTime < min) {
-            min = working.getFirst().arrivalTime;
-        }
+        double min = working.getFirst().arrivalTime;    // Heure de la prochaine demande
         for (Elevator e : elevators) {
             if (e.currentActionCompletionTime < min && (e.currentActionCompletionTime > time || e.target != null)) {
-                min = e.currentActionCompletionTime;
+                min = e.currentActionCompletionTime;    // Heure du prochain évènement lié à l'ascenseur
             }
         }
         return min;
     }
 
+    // Threads pour arrêter la simulation avant que la limite de clients soit atteinte
     private static class Stopper extends Thread {
         ElevatorSim sim;
         boolean mode;

@@ -3,10 +3,11 @@ import java.util.LinkedList;
 
 public class Elevator {
     ElevatorSim sim;
-    LinkedList<Person> carrying = new LinkedList<>();
-    Person target = null;
-    double floor;
-    double currentActionCompletionTime = 0;
+    LinkedList<Person> carrying = new LinkedList<>();   // Personnes dans l'ascenseur
+    Person target = null;   // Personne dont la demande va être traitée
+    double floor;   // Étage actuel
+    double currentActionCompletionTime = 0; // Heure à laquelle l'action en cours sera terminée
+                                            // (heure du prochain évènement lié à cet ascenseur)
     boolean direction = false;  // true = vers le haut
 
     public Elevator(ElevatorSim s) {
@@ -18,18 +19,21 @@ public class Elevator {
         if (deltaTime < 0) {
             return;
         }
+        // Si il n'y a personne dans l'ascenseur
         if (carrying.isEmpty()) {
+            // Si il n'y a aucune demande à traiter
             if (sim.calls.stream().noneMatch(person -> (person.targetTakenBy == this || person.targetTakenBy == null))) {
                 target = null;
-                moveToIdle(deltaTime, idle);
-            } else {
-                moveToNextTarget(deltaTime, scheduler);
+                moveToIdle(deltaTime, idle);    // Appliquer la politique d'attente
+            } else {    // Sinon
+                moveToNextTarget(deltaTime, scheduler); // Acquisition et déplacement vers la prochaine cible
             }
-        } else {
-            carryPeople(deltaTime, scheduler, idle, log);
+        } else {    // Sinon
+            carryPeople(deltaTime, scheduler, idle, log);   // Traiter les demandes des personnes à bord
         }
     }
 
+    // Application de la politique d'attente
     private void moveToIdle(double deltaTime, String mode) {
         switch (mode) {
             case "low":
@@ -57,6 +61,8 @@ public class Elevator {
         }
     }
 
+    // Trouve une personne dont la demande n'est pas prise en compte et l'assigne comme cible
+    // (si elle existe, dans l'ordre d'arrivée des demandes)
     private void findFreeTarget() {
         for (Person p : sim.calls) {
             if (p.targetTakenBy == null) {
@@ -66,7 +72,9 @@ public class Elevator {
         }
     }
 
+    // Acquisition/déplacement vers la prochaine cible
     private void moveToNextTarget(double deltaTime, String mode) {
+        // Si la cible n'est pas valide, acquisition d'une nouvelle cible
         if (target == null || !sim.calls.contains(target)) {
             target = null;
             // fcfs,  sstf  ou  ls
@@ -104,11 +112,13 @@ public class Elevator {
                     System.exit(-1);
             }
         }
+        // Prise en compte des demandes de toutes les personnes au même étage que la cible
         for (Person p : sim.calls) {
             if (p.origin == target.origin && p.targetTakenBy == null) {
                 p.targetTakenBy = this;
             }
         }
+        // Déplacement vers la cible
         if (floor < target.origin) {
             floor = Math.min(target.origin, floor + deltaTime * sim.elevatorSpeed);
             currentActionCompletionTime = sim.time + (target.origin - floor) / sim.elevatorSpeed;
@@ -116,9 +126,11 @@ public class Elevator {
             floor = Math.max(target.origin, floor - deltaTime * sim.elevatorSpeed);
             currentActionCompletionTime = sim.time + (floor - target.origin) / sim.elevatorSpeed;
         }
+        // Si on a atteint l'étage de départ de la cible
         if (Math.abs(floor - target.origin) < 1E-6) {  // Pour contourner les erreurs de précision des doubles
             floor = target.origin;
             target = null;
+            // Montée de toutes les personnes en attente à cet étage
             for (Person p : sim.calls) {
                 if (p.origin == floor) {
                     carrying.addLast(p);
@@ -132,6 +144,7 @@ public class Elevator {
         }
     }
 
+    // Traitement des demandes des personnes à bord (dans l'ordre des demandes)
     private void carryPeople(double deltaTime, String s, String i, boolean log) {
         if (deltaTime <= 0) {
             if (!carrying.isEmpty()) {
@@ -148,9 +161,11 @@ public class Elevator {
             floor = Math.max(carrying.getFirst().destination, floor - deltaTime * sim.elevatorSpeed);
             currentActionCompletionTime = sim.time + (floor - carrying.getFirst().destination) / sim.elevatorSpeed;
         }
-        if (Math.abs(floor - carrying.getFirst().destination) < 0.000001) {  // Pour contourner les erreurs de précision des doubles
+        // Si on a atteint la destination de la première demande
+        if (Math.abs(floor - carrying.getFirst().destination) < 1E-6) {  // Pour contourner les erreurs de précision des doubles
             floor = carrying.getFirst().destination;
             LinkedList<Person> toRemove = new LinkedList<>();
+            // Débarquement de toutes les personnes voulant descendre à cet étage
             if (floor != 0) {
                 for (Person p : carrying) {
                     if (p.destination == floor) {
@@ -173,6 +188,7 @@ public class Elevator {
                         toRemove.add(p);
                     }
                 }
+                // Log des temps d'attente des personnes qui descendent
                 for (Person p : toRemove) {
                     carrying.remove(p);
                     p.waitingTime += sim.time - p.arrivalTime;
